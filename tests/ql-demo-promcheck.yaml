@@ -1,0 +1,29 @@
+# Asks the cluster's Prometheus (kube-prometheus-stack release kps) what it sees of podinfo.
+# Before a demo: all three queries return empty results (no ServiceMonitor yet).
+# After the loop: up shows the :9779 target at 0 and the :9797 target at 1, and podinfo metrics are present.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-promcheck
+  labels:
+    demo: quality-loop
+    type: rehearsal
+spec:
+  container:
+    image: curlimages/curl:8.10.1
+  steps:
+    - name: up{service="podinfo"} over the last 10 minutes
+      shell: |
+        curl -sG --max-time 10 http://kps-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query \
+          --data-urlencode 'query=up{service="podinfo"}[10m]'
+        echo
+    - name: go_goroutines{service="podinfo"} now
+      shell: |
+        curl -sG --max-time 10 http://kps-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query \
+          --data-urlencode 'query=go_goroutines{service="podinfo"}'
+        echo
+    - name: podinfo HTTP metric names
+      shell: |
+        curl -sG --max-time 10 http://kps-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/label/__name__/values \
+          --data-urlencode 'match[]={service="podinfo",__name__=~"http_.*"}'
+        echo

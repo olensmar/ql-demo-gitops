@@ -45,7 +45,8 @@ Show the asserted behaviours in one short list.
 1. `run_workflow` for `ql-demo-smoke` and `ql-demo-pr-$ARGUMENTS`, both with the runner target above.
 2. `wait_for_executions` on both IDs. If it returns no status, poll `get_execution_info` until finished.
 3. For each execution, get a link with `build_dashboard_url` (resourceType `execution`).
-4. Record the attempt: number, SHA, statuses, links.
+4. Record the attempt: number, SHA, statuses, execution links, and for a failure the one-line reason
+   (e.g. `connection refused on :9797/metrics`).
 5. Both passed → Phase 5. Otherwise → Phase 4.
 
 ## Phase 4 — Remediate (attempts 1..3)
@@ -65,4 +66,27 @@ Post one PR comment with `gh pr comment $ARGUMENTS --body-file -` containing:
 - For each remediation: classification, root cause, reviewer verdict
 - Footer: "Merge decision stays with a human."
 
-Finish by printing the same summary in the terminal, including the PR URL.
+Keep the comment URL that `gh pr comment` prints.
+
+## Final output
+End the run with this summary and nothing after it. Print full URLs (not markdown links) so they are
+clickable in any terminal. Get workflow links with `build_dashboard_url` (resourceType `workflow`).
+
+```
+Quality loop for PR #<N>: ✅ PASSED after <n> attempt(s)        (or ❌ needs human attention)
+
+PR:        <PR url>
+Report:    <PR comment url>
+Workflows: ql-demo-smoke   <workflow url>
+           ql-demo-pr-<N>  <workflow url>
+
+Attempt 1 · <short SHA> · smoke ✅ · acceptance ❌ <one-line reason>
+  smoke       <execution url>
+  acceptance  <execution url>
+  fix         <classification>: <one-line root cause> → reviewer APPROVE, commit <short SHA>
+Attempt 2 · <short SHA> · smoke ✅ · acceptance ✅
+  smoke       <execution url>
+  acceptance  <execution url>
+
+Merge decision stays with a human.
+```
