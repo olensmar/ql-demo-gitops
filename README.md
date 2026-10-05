@@ -44,6 +44,12 @@ REPO_URL=https://github.com/olensmar/ql-demo-gitops.git ./bootstrap/install-argo
 Wait until both apps are Synced/Healthy at http://localhost:8080, then run
 `ql-demo-preflight` in Testkube. All three steps should be green.
 
+### Argo CD MCP
+`.mcp.json` launches argocd-mcp through `bootstrap/argocd-mcp.sh`, which reads `ARGOCD_BASE_URL` /
+`ARGOCD_API_TOKEN` from the environment, `.env.local`, or the `env` block of `.claude/settings.local.json`
+(also from the main checkout when running in a worktree). Nothing needs to be exported first, so it works
+in Claude Desktop too.
+
 ### Testkube MCP
 `.mcp.json` points at the hosted endpoint for your environment
 (`tkcorg_9deb42dda2197657` / `tkcenv_a0058057f924cc8d`). The URL assumes the control plane for
@@ -56,7 +62,6 @@ connector's prefix as shown in `/mcp`.
 
 ## Run the demo
 ```bash
-set -a; source .env.local; set +a   # ARGOCD_BASE_URL / ARGOCD_API_TOKEN for argocd-mcp
 ./demo/make-pr.sh                   # opens the PR, note its number
 claude
 > /quality-loop <pr-number>

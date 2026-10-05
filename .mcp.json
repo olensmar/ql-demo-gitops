@@ -1,12 +1,8 @@
 {
   "mcpServers": {
     "argocd": {
-      "command": "npx",
-      "args": ["-y", "argocd-mcp@latest", "stdio"],
-      "env": {
-        "ARGOCD_BASE_URL": "${ARGOCD_BASE_URL}",
-        "ARGOCD_API_TOKEN": "${ARGOCD_API_TOKEN}"
-      }
+      "command": "./bootstrap/argocd-mcp.sh",
+      "args": []
     },
     "testkube": {
       "type": "http",
