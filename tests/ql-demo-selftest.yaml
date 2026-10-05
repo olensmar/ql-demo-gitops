@@ -1,5 +1,6 @@
-# Proves the demo's seeded bug behaves as expected on this cluster:
-# correct PODINFO_UI_MESSAGE is applied; a typo'd key silently falls back to the default.
+# Proves the podinfo behaviour the demo's seeded bug relies on, on this cluster:
+# with --port-metrics=9797 Prometheus metrics are served on 9797, and nothing listens on 9779
+# (the port the demo PR's Service wrongly targets), so that Service port refuses connections.
 apiVersion: testworkflows.testkube.io/v1
 kind: TestWorkflow
 metadata:
@@ -9,24 +10,10 @@ metadata:
     type: selftest
 spec:
   services:
-    good:
+    podinfo:
       image: ghcr.io/stefanprodan/podinfo:6.7.1
-      env:
-        - name: PODINFO_UI_MESSAGE
-          value: "Welcome to the Cloud Native Testing demo"
-        - name: PODINFO_UI_COLOR
-          value: "#34577c"
-      readinessProbe:
-        httpGet:
-          path: /readyz
-          port: 9898
-    typo:
-      image: ghcr.io/stefanprodan/podinfo:6.7.1
-      env:
-        - name: PODINFO_UI_MESAGE
-          value: "Welcome to the Cloud Native Testing demo"
-        - name: PODINFO_UI_COLOR
-          value: "#34577c"
+      command: ["./podinfo"]
+      args: ["--port=9898", "--port-metrics=9797", "--level=info"]
       readinessProbe:
         httpGet:
           path: /readyz
@@ -40,33 +27,29 @@ spec:
 
           export const options = { vus: 1, iterations: 1, thresholds: { checks: ['rate==1'] } };
 
-          function info(base) {
-            const res = http.get(`${base}/api/info`);
-            const body = res.status === 200 ? res.json() : {};
-            console.log(`${base} -> HTTP ${res.status} ${JSON.stringify(body)}`);
-            return body;
+          function observe(url) {
+            const res = http.get(url, { timeout: '5s' });
+            const err = res.error ? ` error="${res.error}"` : '';
+            console.log(`${url} -> HTTP ${res.status}${err}`);
+            return res;
           }
 
           export default function () {
-            const good = info(__ENV.GOOD_URL);
-            const typo = info(__ENV.TYPO_URL);
-            check(good, {
-              'correct key: message is applied': (i) => i.message === 'Welcome to the Cloud Native Testing demo',
-              'correct key: color is applied': (i) => i.color === '#34577c',
+            const metrics = observe(`${__ENV.BASE_URL}:9797/metrics`);
+            const typo = observe(`${__ENV.BASE_URL}:9779/metrics`);
+            check(metrics, {
+              'metrics port 9797 serves Prometheus metrics': (r) => r.status === 200 && (r.body || '').includes('go_goroutines'),
             });
             check(typo, {
-              'typo key: message falls back to default': (i) => typeof i.message === 'string' && i.message.startsWith('greetings from podinfo'),
-              'typo key: color still applied': (i) => i.color === '#34577c',
+              'typo port 9779 refuses connections': (r) => r.status === 0,
             });
           }
   steps:
-    - name: Verify podinfo config behaviour the demo relies on
+    - name: Verify podinfo metrics-port behaviour the demo relies on
       workingDir: /data
       run:
         image: grafana/k6:1.1.0
         env:
-          - name: GOOD_URL
-            value: "http://{{ services.good.0.ip }}:9898"
-          - name: TYPO_URL
-            value: "http://{{ services.typo.0.ip }}:9898"
+          - name: BASE_URL
+            value: "http://{{ services.podinfo.0.ip }}"
         args: ["run", "selftest.js"]

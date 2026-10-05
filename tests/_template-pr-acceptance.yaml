@@ -1,8 +1,10 @@
 # Template the test-author agent copies to tests/pr-<N>.yaml.
 # Rules:
 #   - metadata.name: ql-demo-pr-<N>
-#   - Expected values come from the PR's stated intent (title/body), never copied from config keys.
-#   - Always console.log the observed payload so a failure is diagnosable from the logs alone.
+#   - Ports, paths and expected values come from the PR's stated intent (title/body), never copied
+#     from the manifests or config keys.
+#   - Go through the Service DNS name, like a real client, so Service/port mistakes are caught.
+#   - Always log what was observed so a failure is diagnosable from the logs alone.
 apiVersion: testworkflows.testkube.io/v1
 kind: TestWorkflow
 metadata:
@@ -13,9 +15,9 @@ metadata:
     pr: "0"
 spec:
   config:
-    baseUrl:
+    host:
       type: string
-      default: http://podinfo.ql-demo-preview.svc.cluster.local:9898
+      default: podinfo.ql-demo-preview.svc.cluster.local
   content:
     files:
       - path: /data/acceptance.js
@@ -25,15 +27,25 @@ spec:
 
           export const options = { vus: 1, iterations: 1, thresholds: { checks: ['rate==1'] } };
 
-          export default function () {
-            const res = http.get(`${__ENV.BASE_URL}/api/info`);
-            const info = res.status === 200 ? res.json() : {};
-            console.log(`observed /api/info: HTTP ${res.status} ${JSON.stringify(info)}`);
+          // GET a URL and log what was observed: HTTP status, transport error (e.g. connection refused), body excerpt.
+          function observe(url) {
+            const res = http.get(url, { timeout: '5s' });
+            const err = res.error ? ` error="${res.error}"` : '';
+            console.log(`observed ${url}: HTTP ${res.status}${err} body=${(res.body || '').slice(0, 300)}`);
+            return res;
+          }
 
-            check(res, { 'GET /api/info returns 200': (r) => r.status === 200 });
-            check(info, {
-              // One check per behaviour the PR promises, named in plain language.
-              'UI message is "<expected from PR>"': (i) => i.message === '<expected from PR>',
+          export default function () {
+            const host = __ENV.HOST;
+
+            // Baseline: the app still answers on its main port.
+            const info = observe(`http://${host}:9898/api/info`);
+            check(info, { 'app answers on port 9898': (r) => r.status === 200 });
+
+            // One check per behaviour the PR promises, named in plain language.
+            const promised = observe(`http://${host}:<port from PR>/<path from PR>`);
+            check(promised, {
+              '<behaviour the PR promises>': (r) => r.status === 200 /* && <expected content> */,
             });
           }
   steps:
@@ -42,6 +54,6 @@ spec:
       run:
         image: grafana/k6:1.1.0
         env:
-          - name: BASE_URL
-            value: "{{ config.baseUrl }}"
+          - name: HOST
+            value: "{{ config.host }}"
         args: ["run", "acceptance.js"]

@@ -18,6 +18,8 @@ any reviewer feedback from a rejected earlier attempt.
    `observed`, `✗`, or `level=error`). Note which checks failed and the observed values.
 2. Argo CD: `get_application` (sync revision, health) and, if the app is unhealthy,
    `get_application_resource_tree`, `get_resource_events` and `get_application_workload_logs`.
+   Synced/Healthy does not mean it works: for connection errors, compare the live Service and Deployment
+   with `get_application_managed_resources`.
 3. Read the repo: `apps/podinfo/**` and `tests/pr-<N>.yaml`, plus `git diff origin/main...HEAD`.
 
 ## Classify the failure (pick exactly one)

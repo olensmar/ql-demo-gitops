@@ -1,31 +1,89 @@
 #!/usr/bin/env bash
-# Opens the demo PR: a one-line config change with a seeded typo in the message key.
-# Argo CD will be green; only a behavioural test catches it.
+# Opens the demo PR: expose podinfo's Prometheus metrics on a dedicated port, with a seeded
+# Service targetPort typo (9779 instead of 9797). Argo CD will be green and the probes pass;
+# only a behavioural test that scrapes the promised port catches it.
 set -euo pipefail
-BRANCH="${BRANCH:-feat/demo-welcome-message}"
+BRANCH="${BRANCH:-feat/expose-metrics-port}"
 cd "$(dirname "$0")/.."
 
 git fetch origin main
 git checkout -B "$BRANCH" origin/main
 
-cat > apps/podinfo/base/config.env <<'EOF'
-PODINFO_UI_MESAGE=Welcome to the Cloud Native Testing demo
-PODINFO_UI_COLOR=#34577c
+cat > apps/podinfo/base/deployment.yaml <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinfo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: podinfo
+  template:
+    metadata:
+      labels:
+        app: podinfo
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          command: ["./podinfo", "--port=9898", "--port-metrics=9797", "--level=info"]
+          ports:
+            - name: http
+              containerPort: 9898
+            - name: metrics
+              containerPort: 9797
+          envFrom:
+            - configMapRef:
+                name: podinfo-config
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
 EOF
 
-git add apps/podinfo/base/config.env
-git commit -m "Update podinfo welcome message and brand colour"
+cat > apps/podinfo/base/service.yaml <<'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: podinfo
+spec:
+  selector:
+    app: podinfo
+  ports:
+    - name: http
+      port: 9898
+      targetPort: http
+    - name: metrics
+      port: 9797
+      targetPort: 9779
+EOF
+
+git add apps/podinfo/base/deployment.yaml apps/podinfo/base/service.yaml
+git commit -m "Expose Prometheus metrics on dedicated port 9797"
 git push -u --force origin "$BRANCH"
 
 gh pr create --base main --head "$BRANCH" \
-  --title "Update podinfo welcome message and brand colour" \
+  --title "Expose Prometheus metrics on dedicated port 9797" \
   --body "$(cat <<'EOF'
-For the Cloud Native Testing demo, podinfo should greet visitors with our own message and use the brand colour.
+Our Prometheus scrapes every workload on a dedicated `metrics` port, kept separate from app traffic.
+This exposes the podinfo metrics there.
 
 **Intended behaviour**
-- UI message: `Welcome to the Cloud Native Testing demo`
-- UI colour: `#34577c`
+- `http://podinfo.<namespace>.svc.cluster.local:9797/metrics` serves Prometheus metrics (HTTP 200)
+- App traffic is unchanged on port 9898
 
-Config-only change, no code.
+Manifests only (Deployment + Service), no code.
 EOF
 )"

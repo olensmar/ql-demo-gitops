@@ -1,6 +1,6 @@
 # AI quality loop demo: GitOps PR → test → remediate
 
-A PR changes one line of config. Agents write a test for what the PR *intends*, deploy it to a preview
+A PR exposes a Prometheus metrics port. Agents write a test for what the PR *intends*, deploy it to a preview
 namespace via Argo CD, run the test in Testkube, find the bug, get the fix reviewed, and re-run until green.
 A human merges.
 
@@ -18,9 +18,10 @@ PR opened ─▶ test-author ─▶ push to `preview` ─▶ Argo CD sync (MCP) 
 | remediator | `.claude/agents/remediator.md` | read Testkube + Argo CD, edit files (no commit) |
 | reviewer | `.claude/agents/reviewer.md` | read-only, `VERDICT: APPROVE / REJECT` |
 
-The seeded bug is in the PR's config: the message key is spelled `PODINFO_UI_MESAGE`. Argo CD is
-Synced/Healthy, the colour check passes, and only the behavioural check fails.
-`tests/ql-demo-selftest.yaml` proves this behaviour on your cluster.
+The seeded bug is in the PR's Service: the new `metrics` port has `targetPort: 9779` while the container
+listens on 9797. Argo CD is Synced/Healthy (probes use the `http` port, a ClusterIP Service is always
+Healthy), the smoke test passes on 9898, and only the behavioural check fails with connection refused.
+`tests/ql-demo-selftest.yaml` proves the podinfo side of this on your cluster.
 
 ## Prerequisites
 - minikube running, with the Testkube runner `default-runner-agent` already installed
@@ -68,15 +69,15 @@ claude
 ```
 
 What the audience sees, with three windows open (PR, Argo CD, Testkube):
-1. test-author lists the behaviours it will assert (message + colour, taken from the PR body).
+1. test-author lists the behaviours it will assert (metrics on 9797 via the Service, app still on 9898, taken from the PR body).
 2. The agent pushes to `preview` and syncs via MCP. Argo CD goes **green**.
-3. Testkube: smoke ✅, acceptance ❌. Logs show `message: "greetings from podinfo v6.7.1"`.
-4. remediator: **config-bug**, typo `PODINFO_UI_MESAGE`. The fix is a one-character diff.
+3. Testkube: smoke ✅, acceptance ❌. Logs show `:9797/metrics` → `connection refused`.
+4. remediator: **config-bug**. The live Service targets 9779 but the container port is 9797. The fix is one line: `targetPort: metrics`.
 5. reviewer: **APPROVE**. It is a config fix, the test is unchanged, and it is within scope.
 6. Re-deploy, re-run: both ✅. A PR comment lists both attempts with Testkube links.
 
 **Variation:** to show the reviewer earning its keep, tell the remediator in-session that "the test is
-probably wrong". The reviewer should reject a fix that changes the expected message to the default greeting.
+probably wrong". The reviewer should reject a fix that drops the metrics check or points the test at port 9898.
 
 Reset between runs: `./demo/reset.sh <pr-number>`.
 

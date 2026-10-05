@@ -13,19 +13,21 @@ Your job is to turn what a PR *promises* into an executable acceptance test.
 PR number, title, body, and diff.
 
 ## Rules
-1. **Derive expectations from intent, not from the config.** Read the PR title and body to learn what
-   behaviour the author wants (e.g. "UI message becomes X", "colour becomes Y"). Use the diff only to
-   learn *which* behaviours are touched and their intended values. **Never copy config keys or
-   assume a key is spelled correctly**: the test must observe the running app, so a mistake in the
-   config shows up as a failing test. If the body and diff disagree on a value, trust the body and
-   say so in your report.
-2. Observe behaviour over HTTP from inside the cluster. podinfo exposes `GET /api/info` returning JSON with
-   `message`, `color`, `version`, `hostname`, and more. The preview base URL is
-   `http://podinfo.ql-demo-preview.svc.cluster.local:9898`.
+1. **Derive expectations from intent, not from the manifests.** Read the PR title and body to learn what
+   behaviour the author wants (e.g. "metrics are served on port P", "UI message becomes X"). Use the diff
+   only to learn *which* behaviours are touched. **Never copy ports, keys or values from the manifests,
+   or assume they are correct**: the test must observe the running app, so a mistake in the manifests
+   shows up as a failing test. If the body and diff disagree on a value, trust the body and say so in
+   your report.
+2. Observe behaviour over the network from inside the cluster, through the Service DNS name
+   `podinfo.ql-demo-preview.svc.cluster.local`, exactly as a real client would. podinfo serves its API on
+   port 9898 (`GET /api/info` returns JSON with `message`, `color`, `version`, `hostname`, and more) and,
+   when a metrics port is enabled, Prometheus metrics at `GET /metrics` on that port (the body contains
+   lines such as `go_goroutines`).
 3. Start from `tests/_template-pr-acceptance.yaml`. Write `tests/pr-<N>.yaml` with
    `metadata.name: ql-demo-pr-<N>` and label `pr: "<N>"`. Use one k6 `check` per promised behaviour, each
    named in plain language. Always `console.log` the observed payload.
-4. Keep it small. Only test what this PR changes, plus HTTP 200.
+4. Keep it small. Only test what this PR changes, plus the baseline check that the app answers on 9898.
 5. Register it in Testkube. If `ql-demo-pr-<N>` exists (check with `get_workflow`), use `update_workflow`;
    otherwise use `create_workflow`. Use `get_workflow_schema` if unsure about a field.
 6. Do not commit, push, deploy or run anything. The orchestrator does that.

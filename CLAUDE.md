@@ -4,6 +4,6 @@ GitOps repo for the AI quality-loop demo. Argo CD on minikube deploys `apps/podi
 `ql-demo-prod` tracks `main` (auto-sync), `ql-demo-preview` tracks the `preview` branch (synced by the agent).
 Tests are Testkube TestWorkflows in `tests/` and run on runner `default-runner-agent` inside the cluster.
 
-- App behaviour is configured only via `apps/podinfo/base/config.env` (podinfo reads `PODINFO_*` env vars).
+- The app is defined in `apps/podinfo/base/`: `config.env` for app settings (podinfo reads `PODINFO_*` env vars), `deployment.yaml` / `service.yaml` for ports and runtime.
 - Never modify `apps/podinfo/overlays/prod`, never push to `main`, never merge PRs.
 - The loop is `/quality-loop <pr>`; roles are in `.claude/agents/`.
