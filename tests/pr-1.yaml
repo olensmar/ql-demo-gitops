@@ -1,0 +1,61 @@
+# Acceptance test for PR #1: "Expose Prometheus metrics on dedicated port 9797".
+# Expectations come from the PR body:
+#   - http://podinfo.<namespace>.svc.cluster.local:9797/metrics serves Prometheus metrics (HTTP 200)
+#   - App traffic is unchanged on port 9898
+# Goes through the Service DNS name, like Prometheus would, so Service/port mistakes are caught.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-pr-1
+  labels:
+    demo: quality-loop
+    generated-by: test-author
+    pr: "1"
+spec:
+  config:
+    host:
+      type: string
+      default: podinfo.ql-demo-preview.svc.cluster.local
+  content:
+    files:
+      - path: /data/acceptance.js
+        content: |
+          import http from 'k6/http';
+          import { check } from 'k6';
+
+          export const options = { vus: 1, iterations: 1, thresholds: { checks: ['rate==1'] } };
+
+          // GET a URL and log what was observed: HTTP status, transport error (e.g. connection refused), body excerpt.
+          function observe(url) {
+            const res = http.get(url, { timeout: '5s' });
+            const err = res.error ? ` error="${res.error}"` : '';
+            console.log(`observed ${url}: HTTP ${res.status}${err} body=${(res.body || '').slice(0, 300)}`);
+            return res;
+          }
+
+          export default function () {
+            const host = __ENV.HOST;
+
+            // Promise: app traffic is unchanged on port 9898.
+            const info = observe(`http://${host}:9898/api/info`);
+            check(info, {
+              'app traffic still answers on port 9898 (HTTP 200)': (r) => r.status === 200,
+            });
+
+            // Promise: Prometheus metrics are served on the dedicated port 9797 at /metrics.
+            const metrics = observe(`http://${host}:9797/metrics`);
+            check(metrics, {
+              'metrics endpoint on port 9797 answers with HTTP 200': (r) => r.status === 200,
+              'port 9797 /metrics returns Prometheus exposition format': (r) =>
+                r.status === 200 && /^# (HELP|TYPE) /m.test(r.body || ''),
+            });
+          }
+  steps:
+    - name: Acceptance checks for PR #1
+      workingDir: /data
+      run:
+        image: grafana/k6:1.1.0
+        env:
+          - name: HOST
+            value: "{{ config.host }}"
+        args: ["run", "acceptance.js"]
