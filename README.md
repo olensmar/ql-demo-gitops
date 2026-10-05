@@ -21,7 +21,8 @@ PR opened ─▶ test-author ─▶ push to `preview` ─▶ Argo CD sync (MCP) 
 The seeded bug is in the PR's Service: the new `metrics` port has `targetPort: 9779` while the container
 listens on 9797. Argo CD is Synced/Healthy (probes use the `http` port, a ClusterIP Service is always
 Healthy), the smoke test passes on 9898, and only the behavioural check fails with connection refused.
-`tests/ql-demo-selftest.yaml` proves the podinfo side of this on your cluster.
+The PR also adds a ServiceMonitor (`release: kps`), so the cluster's kube-prometheus-stack shows the podinfo
+target **down** until the fix lands. `tests/ql-demo-selftest.yaml` proves the podinfo side of this on your cluster.
 
 ## Prerequisites
 - minikube running, with the Testkube runner `default-runner-agent` already installed
@@ -63,27 +64,39 @@ connector's prefix as shown in `/mcp`.
 
 ## Run the demo
 ```bash
+# once: the state every demo starts from (reset.sh restores main to it after an on-stage merge)
+git tag demo-baseline origin/main && git push origin demo-baseline
+
+# separate terminal: Prometheus UI on http://localhost:9090/targets
+kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090
+
 ./demo/make-pr.sh                   # opens the PR, note its number
 claude
 > /quality-loop <pr-number>
 ```
 
-What the audience sees, with three windows open (PR, Argo CD, Testkube):
+What the audience sees, with four windows open (PR, Argo CD, Testkube, Prometheus):
 1. test-author lists the behaviours it will assert (metrics on 9797 via the Service, app still on 9898, taken from the PR body).
 2. The agent pushes to `preview` and syncs via MCP. Argo CD goes **green**.
-3. Testkube: smoke ✅, acceptance ❌. Logs show `:9797/metrics` → `connection refused`.
+3. Testkube: smoke ✅, acceptance ❌. Logs show `:9797/metrics` → `connection refused`. Prometheus shows the
+   `ql-demo-preview` podinfo target **down**.
 4. remediator: **config-bug**. The live Service targets 9779 but the container port is 9797. The fix is one line: `targetPort: metrics`.
 5. reviewer: **APPROVE**. It is a config fix, the test is unchanged, and it is within scope.
-6. Re-deploy, re-run: both ✅. A PR comment lists both attempts with Testkube links.
+6. Re-deploy, re-run: both ✅, and the preview target turns **up** in Prometheus. A PR comment lists both
+   attempts with Testkube links.
+7. A human merges the PR on stage. `ql-demo-prod` auto-syncs from `main` (press **Refresh** in Argo CD), and
+   the prod podinfo target appears **up** in Prometheus.
 
 **Variation:** to show the reviewer earning its keep, tell the remediator in-session that "the test is
 probably wrong". The reviewer should reject a fix that drops the metrics check or points the test at port 9898.
 
-Reset between runs: `./demo/reset.sh <pr-number>`.
+Reset between runs: `./demo/reset.sh <pr-number>`. If the PR was merged, it also restores `apps/podinfo` on
+`main` to the `demo-baseline` tag, so prod rolls back and the next run starts from the same manifests.
 
 ## Guardrails
 - Argo CD RBAC: `ql-agent` can **get** everything but **sync only `ql-demo-preview`**.
-- `.claude/settings.json` denies pushes to main, `gh pr merge`, `kubectl`, and edits to the prod overlay.
+- `.claude/settings.json` denies pushes to main (including `HEAD:main` refspecs), `gh pr merge`, `kubectl`,
+  and edits to the prod overlay.
 - Fixes need reviewer approval. The loop stops after 3 attempts.
 
 ## Next steps

@@ -31,6 +31,8 @@
     "deny": [
       "Bash(git push * main*)",
       "Bash(git push --force origin HEAD:main*)",
+      "Bash(git push *refs/heads/main*)",
+      "Bash(git push *:main*)",
       "Bash(gh pr merge *)",
       "Bash(kubectl *)",
       "mcp__argocd__delete_application",
