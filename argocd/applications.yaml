@@ -1,0 +1,43 @@
+# REPO_URL is substituted by bootstrap/install-argocd.sh
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ql-demo-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL
+    targetRevision: main
+    path: apps/podinfo/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ql-demo-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# Preview tracks the `preview` branch. The quality-loop agent force-pushes the
+# PR head there and triggers the sync itself (no auto-sync on purpose, so the
+# MCP-driven sync is visible on stage).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ql-demo-preview
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL
+    targetRevision: preview
+    path: apps/podinfo/overlays/preview
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ql-demo-preview
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

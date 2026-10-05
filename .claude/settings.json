@@ -1,0 +1,43 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__argocd__list_applications",
+      "mcp__argocd__get_application",
+      "mcp__argocd__get_application_resource_tree",
+      "mcp__argocd__get_application_managed_resources",
+      "mcp__argocd__get_application_workload_logs",
+      "mcp__argocd__get_resource_events",
+      "mcp__argocd__sync_application",
+      "mcp__testkube",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checkout *)",
+      "Bash(gh pr comment *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout -- *)",
+      "Bash(git rev-parse *)",
+      "Bash(git push origin HEAD)",
+      "Bash(git push --force origin HEAD:preview)",
+      "Edit(tests/**)",
+      "Edit(apps/podinfo/base/**)",
+      "Write(tests/**)"
+    ],
+    "deny": [
+      "Bash(git push * main*)",
+      "Bash(git push --force origin HEAD:main*)",
+      "Bash(gh pr merge *)",
+      "Bash(kubectl *)",
+      "mcp__argocd__delete_application",
+      "mcp__argocd__create_application",
+      "mcp__argocd__update_application",
+      "mcp__argocd__run_resource_action",
+      "Edit(apps/podinfo/overlays/prod/**)"
+    ]
+  }
+}

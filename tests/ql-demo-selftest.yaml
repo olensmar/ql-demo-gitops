@@ -1,0 +1,72 @@
+# Proves the demo's seeded bug behaves as expected on this cluster:
+# correct PODINFO_UI_MESSAGE is applied; a typo'd key silently falls back to the default.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-selftest
+  labels:
+    demo: quality-loop
+    type: selftest
+spec:
+  services:
+    good:
+      image: ghcr.io/stefanprodan/podinfo:6.7.1
+      env:
+        - name: PODINFO_UI_MESSAGE
+          value: "Welcome to the Cloud Native Testing demo"
+        - name: PODINFO_UI_COLOR
+          value: "#34577c"
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: 9898
+    typo:
+      image: ghcr.io/stefanprodan/podinfo:6.7.1
+      env:
+        - name: PODINFO_UI_MESAGE
+          value: "Welcome to the Cloud Native Testing demo"
+        - name: PODINFO_UI_COLOR
+          value: "#34577c"
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: 9898
+  content:
+    files:
+      - path: /data/selftest.js
+        content: |
+          import http from 'k6/http';
+          import { check } from 'k6';
+
+          export const options = { vus: 1, iterations: 1, thresholds: { checks: ['rate==1'] } };
+
+          function info(base) {
+            const res = http.get(`${base}/api/info`);
+            const body = res.status === 200 ? res.json() : {};
+            console.log(`${base} -> HTTP ${res.status} ${JSON.stringify(body)}`);
+            return body;
+          }
+
+          export default function () {
+            const good = info(__ENV.GOOD_URL);
+            const typo = info(__ENV.TYPO_URL);
+            check(good, {
+              'correct key: message is applied': (i) => i.message === 'Welcome to the Cloud Native Testing demo',
+              'correct key: color is applied': (i) => i.color === '#34577c',
+            });
+            check(typo, {
+              'typo key: message falls back to default': (i) => typeof i.message === 'string' && i.message.startsWith('greetings from podinfo'),
+              'typo key: color still applied': (i) => i.color === '#34577c',
+            });
+          }
+  steps:
+    - name: Verify podinfo config behaviour the demo relies on
+      workingDir: /data
+      run:
+        image: grafana/k6:1.1.0
+        env:
+          - name: GOOD_URL
+            value: "http://{{ services.good.0.ip }}:9898"
+          - name: TYPO_URL
+            value: "http://{{ services.typo.0.ip }}:9898"
+        args: ["run", "selftest.js"]

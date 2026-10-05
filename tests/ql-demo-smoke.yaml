@@ -1,0 +1,22 @@
+# Baseline smoke test, run on every loop iteration alongside the PR-specific test.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-smoke
+  labels:
+    demo: quality-loop
+    type: smoke
+spec:
+  config:
+    namespace:
+      type: string
+      default: ql-demo-preview
+  container:
+    image: curlimages/curl:8.10.1
+  steps:
+    - name: podinfo is up
+      shell: |
+        base="http://podinfo.{{ config.namespace }}.svc.cluster.local:9898"
+        for path in /healthz /readyz /version; do
+          echo "GET $path"; curl -sf --max-time 5 "$base$path"; echo
+        done

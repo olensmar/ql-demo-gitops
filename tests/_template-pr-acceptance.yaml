@@ -1,0 +1,47 @@
+# Template the test-author agent copies to tests/pr-<N>.yaml.
+# Rules:
+#   - metadata.name: ql-demo-pr-<N>
+#   - Expected values come from the PR's stated intent (title/body), never copied from config keys.
+#   - Always console.log the observed payload so a failure is diagnosable from the logs alone.
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-pr-0
+  labels:
+    demo: quality-loop
+    generated-by: test-author
+    pr: "0"
+spec:
+  config:
+    baseUrl:
+      type: string
+      default: http://podinfo.ql-demo-preview.svc.cluster.local:9898
+  content:
+    files:
+      - path: /data/acceptance.js
+        content: |
+          import http from 'k6/http';
+          import { check } from 'k6';
+
+          export const options = { vus: 1, iterations: 1, thresholds: { checks: ['rate==1'] } };
+
+          export default function () {
+            const res = http.get(`${__ENV.BASE_URL}/api/info`);
+            const info = res.status === 200 ? res.json() : {};
+            console.log(`observed /api/info: HTTP ${res.status} ${JSON.stringify(info)}`);
+
+            check(res, { 'GET /api/info returns 200': (r) => r.status === 200 });
+            check(info, {
+              // One check per behaviour the PR promises, named in plain language.
+              'UI message is "<expected from PR>"': (i) => i.message === '<expected from PR>',
+            });
+          }
+  steps:
+    - name: Acceptance checks for PR #0
+      workingDir: /data
+      run:
+        image: grafana/k6:1.1.0
+        env:
+          - name: BASE_URL
+            value: "{{ config.baseUrl }}"
+        args: ["run", "acceptance.js"]

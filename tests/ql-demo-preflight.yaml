@@ -1,0 +1,33 @@
+# Run before a demo: confirms the runner is on minikube, Argo CD is reachable,
+# and the preview app answers. Steps 2-3 are optional (informational).
+apiVersion: testworkflows.testkube.io/v1
+kind: TestWorkflow
+metadata:
+  name: ql-demo-preflight
+  labels:
+    demo: quality-loop
+    type: preflight
+spec:
+  container:
+    image: curlimages/curl:8.10.1
+    env:
+      - name: NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+  steps:
+    - name: Which cluster is this runner on
+      shell: |
+        echo "node: $NODE_NAME"
+        echo "kubernetes version:"
+        curl -sk https://kubernetes.default.svc/version || echo "(version endpoint not readable)"
+    - name: Argo CD reachable in-cluster
+      optional: true
+      shell: |
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://argocd-server.argocd.svc.cluster.local/healthz || true)
+        echo "argocd-server /healthz -> $code"
+        [ "$code" = "200" ]
+    - name: Preview app reachable in-cluster
+      optional: true
+      shell: |
+        curl -sf --max-time 5 http://podinfo.ql-demo-preview.svc.cluster.local:9898/api/info

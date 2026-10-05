@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "argocd": {
+      "command": "npx",
+      "args": ["-y", "argocd-mcp@latest", "stdio"],
+      "env": {
+        "ARGOCD_BASE_URL": "${ARGOCD_BASE_URL}",
+        "ARGOCD_API_TOKEN": "${ARGOCD_API_TOKEN}"
+      }
+    },
+    "testkube": {
+      "type": "http",
+      "url": "${TESTKUBE_MCP_URL:-https://api.testkube.dev/organizations/tkcorg_9deb42dda2197657/environments/tkcenv_a0058057f924cc8d/mcp}"
+    }
+  }
+}
