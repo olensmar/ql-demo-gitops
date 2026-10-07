@@ -8,6 +8,7 @@ labels:
 resources:
   - deployment.yaml
   - service.yaml
+  - servicemonitor.yaml
 # Edit config.env to change app behaviour. The generated ConfigMap name gets a
 # content hash, so any change rolls the Deployment automatically.
 configMapGenerator:
