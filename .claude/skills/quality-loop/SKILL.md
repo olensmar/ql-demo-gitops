@@ -69,24 +69,25 @@ Post one PR comment with `gh pr comment $ARGUMENTS --body-file -` containing:
 Keep the comment URL that `gh pr comment` prints.
 
 ## Final output
-End the run with this summary and nothing after it. Print full URLs (not markdown links) so they are
-clickable in any terminal. Get workflow links with `build_dashboard_url` (resourceType `workflow`).
+End the run with this summary and nothing after it. Print it as **normal markdown, never inside a code
+block**: Claude Code turns markdown links into clickable terminal hyperlinks, but prints code blocks as plain
+text, where long URLs wrap and can't be clicked. Use short labelled links `[label](url)`, never bare URLs.
+Get workflow links with `build_dashboard_url` (resourceType `workflow`).
 
-```
-Quality loop for PR #<N>: ✅ PASSED after <n> attempt(s)        (or ❌ needs human attention)
+Template (shown in a code block here only so you can see the markdown; do not print the fence):
 
-PR:        <PR url>
-Report:    <PR comment url>
-Workflows: ql-demo-smoke   <workflow url>
-           ql-demo-pr-<N>  <workflow url>
+```markdown
+**Quality loop for PR #<N>: ✅ PASSED after <n> attempt(s)**   (or ❌ needs human attention)
 
-Attempt 1 · <short SHA> · smoke ✅ · acceptance ❌ <one-line reason>
-  smoke       <execution url>
-  acceptance  <execution url>
-  fix         <classification>: <one-line root cause> → reviewer APPROVE, commit <short SHA>
-Attempt 2 · <short SHA> · smoke ✅ · acceptance ✅
-  smoke       <execution url>
-  acceptance  <execution url>
+- **PR:** [#<N> <title>](<PR url>) · [report comment](<PR comment url>)
+- **Workflows:** [ql-demo-smoke](<workflow url>) · [ql-demo-pr-<N>](<workflow url>)
+
+**Attempt 1** · `<short SHA>` · smoke ✅ · acceptance ❌ <one-line reason>
+- [smoke run](<execution url>) · [acceptance run](<execution url>)
+- fix: <classification>, <one-line root cause> → reviewer APPROVE, commit `<short SHA>`
+
+**Attempt 2** · `<short SHA>` · smoke ✅ · acceptance ✅
+- [smoke run](<execution url>) · [acceptance run](<execution url>)
 
 Merge decision stays with a human.
 ```
