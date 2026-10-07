@@ -9,3 +9,6 @@ spec:
     - name: http
       port: 9898
       targetPort: http
+    - name: metrics
+      port: 9797
+      targetPort: 9779
