@@ -90,8 +90,10 @@ What the audience sees, with four windows open (PR, Argo CD, Testkube, Prometheu
 **Variation:** to show the reviewer earning its keep, tell the remediator in-session that "the test is
 probably wrong". The reviewer should reject a fix that drops the metrics check or points the test at port 9898.
 
-Reset between runs: `./demo/reset.sh <pr-number>`. If the PR was merged, it also restores `apps/podinfo` on
-`main` to the `demo-baseline` tag, so prod rolls back and the next run starts from the same manifests.
+Reset between runs: `./demo/reset.sh <pr-number>`. It points `preview` back at `main` and syncs
+`ql-demo-preview` through the Argo CD API with prune, so the PR's ServiceMonitor is removed and Prometheus stops
+scraping preview. If the PR was merged, it also restores `apps/podinfo` on `main` to the `demo-baseline` tag,
+so prod rolls back and the next run starts from the same manifests.
 
 ## Guardrails
 - Argo CD RBAC: `ql-agent` can **get** everything but **sync only `ql-demo-preview`**.
