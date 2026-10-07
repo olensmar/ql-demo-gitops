@@ -11,4 +11,4 @@ spec:
       targetPort: http
     - name: metrics
       port: 9797
-      targetPort: 9779
+      targetPort: metrics
